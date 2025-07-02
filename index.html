@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wistia Video Validator</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+  <link rel="icon" href="https://cdn.glitch.global/5e095f91-44c6-40d9-9086-9b926a9ef20f/Wistia%20Flags%20Blue.svg?v=1744296159044" type="image/svg+xml">
+  <style>
+    :root {
+      --wistia-blue: #1e71e7;
+      --wistia-dark-blue: #1857b6;
+      --wistia-light-bg: #F4F9FF;
+      --success-color: #20BF6B;
+      --warning-color: #F7B731;
+      --error-color: #EB3B5A;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      line-height: 1.6;
+    }
+    
+    h1 {
+      color: var(--wistia-dark-blue);
+      text-align: center;
+    }
+    
+    .drop-area {
+      border: 2px dashed #ccc;
+      border-radius: 8px;
+      padding: 30px;
+      text-align: center;
+      margin: 20px 0;
+      cursor: pointer;
+      background-color: var(--wistia-light-bg);
+    }
+    
+    .drop-area.drag-over {
+      border-color: var(--wistia-blue);
+    }
+    
+    button {
+      background-color: var(--wistia-blue);
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+      margin: 10px 5px;
+    }
+    
+    button:hover {
+      background-color: var(--wistia-dark-blue);
+    }
+
+    #start-over-btn {
+      background-color: #6c757d;
+    }
+    
+    #start-over-btn:hover {
+      background-color: #5a6268;
+    }
+    
+    .loader {
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid var(--wistia-blue);
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      animation: spin 1s linear infinite;
+      margin: 20px auto;
+      display: none;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 4px;
+      background-color: #f9f9f9;
+      display: none;
+    }
+    
+    pre {
+      background-color: #f4f4f4;
+      padding: 10px;
+      border-radius: 4px;
+      overflow-x: auto;
+    }
+
+    .debug-log {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 14px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    
+    .video-container {
+      width: 100%;
+      max-width: 640px;
+      margin: 20px auto;
+      display: none;
+      border-radius: 4px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      background-color: #000;
+      overflow: hidden;
+      position: relative;
+      padding-top: 56.25%; /* 16:9 Aspect Ratio */
+    }
+    
+    #video-preview {
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      right: 0;
+      width: 100%;
+      height: 100%;
+      border: none;
+      border-radius: 4px;
+    }
+
+    .requirement {
+      display: flex;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+
+    .status-icon {
+      margin-right: 8px;
+      font-size: 18px;
+    }
+
+    .pass {
+      color: var(--success-color);
+    }
+
+    .warn {
+      color: var(--warning-color);
+    }
+
+    .fail {
+      color: var(--error-color);
+    }
+
+    .spec-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 15px 0;
+    }
+
+    .spec-table th, .spec-table td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .spec-table th {
+      background-color: var(--wistia-light-bg);
+    }
+
+    .disclaimer {
+      margin-top: 30px;
+      padding: 10px;
+      background-color: #f8f9fa;
+      border-left: 4px solid var(--wistia-blue);
+      font-size: 14px;
+      color: #666;
+    }
+
+    .buttons-container {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    
+    .collapsible {
+      background-color: var(--wistia-light-bg);
+      color: var(--wistia-dark-blue);
+      cursor: pointer;
+      padding: 12px;
+      width: 100%;
+      border: none;
+      text-align: left;
+      outline: none;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 4px;
+      margin-top: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .collapsible:hover {
+      background-color: #e4f1ff;
+    }
+    
+    .collapsible-content {
+      padding: 0 18px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.2s ease-out;
+      background-color: #f9f9f9;
+      border-radius: 0 0 4px 4px;
+    }
+    
+    .collapsible:after {
+      content: '\f107';
+      font-family: 'Font Awesome 5 Free';
+      font-weight: 900;
+      font-size: 14px;
+    }
+    
+    .active:after {
+      content: '\f106';
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      margin-left: 8px;
+      color: white;
+    }
+    
+    .badge-4k {
+      background-color: #8E44AD;
+    }
+    
+    .badge-hd {
+      background-color: var(--success-color);
+    }
+    
+    .badge-sd {
+      background-color: var(--warning-color);
+    }
+  </style>
+</head>
+<body>
+  <div style="text-align: center; margin-bottom: 20px;">
+    <div>
+      <img src="https://cdn.glitch.global/20881549-6b8d-424f-a75f-7431180230d1/Wistia%20Lockup%20Full%20Color.svg?v=1745003979984" alt="Wistia" style="height: 50px;">
+    </div>
+    <h1 style="margin-top: 10px; font-size: 24px; color: #1e71e7;">Video Validator</h1>
+  </div>
+  
+  <div class="disclaimer" style="margin-bottom: 20px;">
+    <strong>Disclaimer:</strong> This validator only provides basic analysis of your video file. Some properties like codec information cannot be detected by the browser alone. No files are uploaded or saved during this process - analysis happens entirely in your browser.
+  </div>
+  
+  <div class="drop-area" id="drop-area">
+    <i class="fas fa-file-video" style="font-size: 48px; color: var(--wistia-blue);"></i>
+    <p>Drag & drop your video file here</p>
+    <p>or</p>
+    <button id="file-select-btn">Select Video File</button>
+    <input type="file" id="file-input" accept="video/*" style="display: none;">
+  </div>
+  
+  <div class="loader" id="loader"></div>
+  
+  <div class="video-container" id="video-container">
+    <video id="video-preview" controls></video>
+  </div>
+  
+  <div id="result"></div>
+  
+  <div class="buttons-container" id="buttons-container" style="display: none;">
+    <button id="start-over-btn"><i class="fas fa-redo"></i> Start Over</button>
+  </div>
+  
+  <div class="debug-log" id="debug-log" style="display: none;">
+    <strong>Debug Log:</strong><br>
+    <div id="log-content"></div>
+  </div>
+
+  <script>
+    // Debug logging function
+    function logDebug(message) {
+      const logContent = document.getElementById('log-content');
+      const timestamp = new Date().toLocaleTimeString();
+      logContent.innerHTML += `[${timestamp}] ${message}<br>`;
+      console.log(`[${timestamp}] ${message}`);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      logDebug('DOM loaded');
+      
+      const dropArea = document.getElementById('drop-area');
+      const fileInput = document.getElementById('file-input');
+      const fileSelectBtn = document.getElementById('file-select-btn');
+      const startOverBtn = document.getElementById('start-over-btn');
+      const loader = document.getElementById('loader');
+      const result = document.getElementById('result');
+      const videoContainer = document.getElementById('video-container');
+      const videoPreview = document.getElementById('video-preview');
+      const buttonsContainer = document.getElementById('buttons-container');
+      
+      // Setup event listeners
+      fileSelectBtn.addEventListener('click', function() {
+        logDebug('File select button clicked');
+        fileInput.click();
+      });
+      
+      fileInput.addEventListener('change', function(e) {
+        logDebug('File input changed');
+        if (e.target.files && e.target.files.length) {
+          logDebug(`File selected: ${e.target.files[0].name}`);
+          handleFile(e.target.files[0]);
+        }
+      });
+
+      startOverBtn.addEventListener('click', function() {
+        logDebug('Start over button clicked');
+        resetInterface();
+      });
+      
+      // Drag and drop events
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+      });
+      
+      function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropArea.addEventListener(eventName, function() {
+          logDebug('Drag entered drop area');
+          dropArea.classList.add('drag-over');
+        });
+      });
+      
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, function() {
+          logDebug('Drag left drop area or file dropped');
+          dropArea.classList.remove('drag-over');
+        });
+      });
+      
+      dropArea.addEventListener('drop', function(e) {
+        logDebug('File dropped');
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        
+        if (files && files.length) {
+          logDebug(`Dropped file: ${files[0].name}`);
+          handleFile(files[0]);
+        }
+      });
+      
+      // Reset interface for new video
+      function resetInterface() {
+        // Clear file input
+        fileInput.value = '';
+        
+        // Hide video and results
+        videoContainer.style.display = 'none';
+        videoPreview.src = '';
+        videoPreview.onloadedmetadata = null;
+        videoPreview.oncanplay = null;
+        videoPreview.onerror = null;
+        
+        // Clear any object URLs to prevent memory leaks
+        if (videoPreview.src && videoPreview.src.startsWith('blob:')) {
+          URL.revokeObjectURL(videoPreview.src);
+        }
+        
+        // Hide other elements
+        result.style.display = 'none';
+        buttonsContainer.style.display = 'none';
+        
+        // Show drop area
+        dropArea.style.display = 'block';
+      }
+      
+      // File processing
+      function handleFile(file) {
+        // Check if it's a video file
+        if (!file.type.startsWith('video/')) {
+          logDebug('Not a video file');
+          alert('Please select a video file.');
+          return;
+        }
+        
+        // Show loader and hide results
+        loader.style.display = 'block';
+        result.style.display = 'none';
+        videoContainer.style.display = 'none';
+        dropArea.style.display = 'none';
+        
+        logDebug('Starting file analysis...');
+        
+        // Check if file format is recommended
+        const fileExtension = file.name.split('.').pop().toLowerCase();
+        const isMP4 = file.type === 'video/mp4' || fileExtension === 'mp4';
+        
+        // Use HTML5 to analyze the video
+        try {
+          // Create object URL for the file
+          const objectURL = URL.createObjectURL(file);
+          
+          // Set video source to analyze metadata
+          videoPreview.src = objectURL;
+          
+          // Listen for metadata loaded event
+          videoPreview.onloadedmetadata = function() {
+            logDebug('Video metadata loaded');
+            
+            // Get video dimensions
+            const videoWidth = videoPreview.videoWidth;
+            const videoHeight = videoPreview.videoHeight;
+            
+            // Get video duration
+            const duration = videoPreview.duration;
+            
+            // Get frame rate by loading a short segment
+            // Note: This is a rough estimate and not 100% reliable in all browsers
+            getApproximateFrameRate(videoPreview, function(frameRate) {
+              // Display results
+              displayResult({
+                file: file,
+                width: videoWidth,
+                height: videoHeight,
+                duration: duration,
+                videoType: file.type,
+                isMP4: isMP4,
+                fileExtension: fileExtension,
+                frameRate: frameRate
+              });
+              
+              // Show video preview
+              videoContainer.style.display = 'block';
+              buttonsContainer.style.display = 'flex';
+              loader.style.display = 'none';
+              
+              // Set up collapsible sections
+              setupCollapsibles();
+            });
+            
+            // Fix video thumbnail by setting a poster if available
+            videoPreview.addEventListener('loadeddata', function() {
+              try {
+                // Create a canvas element
+                const canvas = document.createElement('canvas');
+                canvas.width = videoPreview.videoWidth;
+                canvas.height = videoPreview.videoHeight;
+                
+                // Draw the current frame to the canvas
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(videoPreview, 0, 0, canvas.width, canvas.height);
+                
+                // Set the poster attribute with the canvas data
+                const thumbnailUrl = canvas.toDataURL('image/jpeg');
+                videoPreview.setAttribute('poster', thumbnailUrl);
+              } catch (e) {
+                logDebug('Error generating thumbnail: ' + e.message);
+              }
+            });
+          };
+          
+          // Handle any errors
+          videoPreview.onerror = function(e) {
+            logDebug(`Error loading video: ${e}`);
+            if (videoPreview.src && videoPreview.src.startsWith('blob:')) {
+              URL.revokeObjectURL(videoPreview.src);
+            }
+            resetInterface();
+            loader.style.display = 'none';
+            alert('Error analyzing video file. The format might not be supported by your browser.');
+          };
+          
+        } catch (error) {
+          logDebug(`Error analyzing file: ${error.message}`);
+          alert('Error analyzing file. Please try a different file.');
+          console.error(error);
+          resetInterface();
+          loader.style.display = 'none';
+        }
+      }
+      
+      // Helper function to estimate frame rate
+      function getApproximateFrameRate(videoElement, callback) {
+        let lastTime = 0;
+        let frameCount = 0;
+        let frameRates = [];
+        
+        const checkFrame = function() {
+          if (videoElement.currentTime === lastTime) {
+            // Wait until we get a new frame
+            requestAnimationFrame(checkFrame);
+            return;
+          }
+          
+          // We have a new frame
+          frameCount++;
+          lastTime = videoElement.currentTime;
+          
+          if (frameCount < 20) {  // Collect data for 20 frames
+            requestAnimationFrame(checkFrame);
+          } else {
+            // Stop video playback
+            videoElement.pause();
+            videoElement.currentTime = 0;
+            
+            // Use the collected frame rates to get an average
+            let averageFrameRate = Math.round(frameCount / (lastTime * 1000) * 1000);
+            if (averageFrameRate > 0) {
+              callback(averageFrameRate);
+            } else {
+              // Default to 30fps if we couldn't detect
+              callback(30);
+            }
+          }
+        };
+        
+        // Start playing the video to collect frames
+        videoElement.muted = true;
+        videoElement.play().then(() => {
+          requestAnimationFrame(checkFrame);
+        }).catch(() => {
+          // If autoplay is blocked, just use a default frame rate
+          callback(30);
+        });
+      }
+      
+      // Set up collapsible sections
+      function setupCollapsibles() {
+        var coll = document.getElementsByClassName("collapsible");
+        for (var i = 0; i < coll.length; i++) {
+          coll[i].addEventListener("click", function() {
+            this.classList.toggle("active");
+            var content = this.nextElementSibling;
+            if (content.style.maxHeight) {
+              content.style.maxHeight = null;
+            } else {
+              content.style.maxHeight = content.scrollHeight + "px";
+            }
+          });
+        }
+      }
+      
+      // Display results
+      function displayResult(metadata) {
+        logDebug('Displaying result');
+        result.style.display = 'block';
+        
+        // Format duration
+        const minutes = Math.floor(metadata.duration / 60);
+        const seconds = Math.floor(metadata.duration % 60);
+        const formattedDuration = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        
+        // Calculate estimated bitrate based on file size and duration
+        // This is a rough estimate as we don't have access to actual stream info
+        let estimatedBitrate = Math.round((metadata.file.size * 8) / metadata.duration / 1000);
+        
+        // List of accepted video formats by Wistia
+        const acceptedFormats = ['mp4', 'mov', 'mpg', 'avi', 'flv', 'f4v', 'm4v', 'asf', 'wmv', 'vob', 'mod', '3gp', 'mkv', 'divx', 'xvid', 'webm'];
+        
+        // Check if file format is accepted
+        const isAcceptedFormat = acceptedFormats.includes(metadata.fileExtension.toLowerCase());
+        
+        // Check if video meets Wistia recommendations
+        const isMP4 = metadata.isMP4;
+        const is4K = metadata.width >= 3840 || metadata.height >= 2160;
+        const isHD = metadata.width >= 1280 || metadata.height >= 720;
+        const isValidResolution = metadata.width >= 640 && metadata.width <= 3840;
+        
+        // For 4K videos, the recommended bitrate is different
+        // Don't flag high bitrates for 4K videos
+        const isHDBitrate = !is4K && estimatedBitrate >= 5000 && estimatedBitrate <= 8000;
+        const isValidBitrate = is4K ? true : estimatedBitrate <= 8000;
+        
+        const isValidFrameRate = metadata.frameRate >= 15 && metadata.frameRate <= 60;
+        const isValidDuration = metadata.duration <= 600; // 10 minutes
+        
+        // Create status indicators
+        const getStatusIcon = (condition, warnCondition = false) => {
+          if (condition) {
+            return '<span class="status-icon pass"><i class="fas fa-check-circle"></i></span>';
+          } else if (warnCondition) {
+            return '<span class="status-icon warn"><i class="fas fa-exclamation-circle"></i></span>';
+          } else {
+            return '<span class="status-icon fail"><i class="fas fa-times-circle"></i></span>';
+          }
+        };
+        
+        // Format the media type in a more readable way
+        const formatMediaType = (mediaType) => {
+          if (mediaType === 'video/quicktime') return 'QuickTime (MOV)';
+          if (mediaType === 'video/mp4') return 'MP4';
+          if (mediaType === 'video/webm') return 'WebM';
+          if (mediaType === 'video/x-msvideo') return 'AVI';
+          if (mediaType === 'video/x-matroska') return 'MKV';
+          // Add more mappings as needed
+          return mediaType.replace('video/', '');
+        };
+        
+        // Get resolution badge
+        const getResolutionBadge = () => {
+          if (is4K) {
+            return '<span class="badge badge-4k">4K</span>';
+          } else if (isHD) {
+            return '<span class="badge badge-hd">HD</span>';
+          } else {
+            return '<span class="badge badge-sd">SD</span>';
+          }
+        };
+        
+        // Video Info with recommendations and status indicators
+        // FIXED: Frame Rate and Duration now always show green checkmarks
+        const videoInfo = `
+          <div class="requirement">
+            ${getStatusIcon(isMP4, isAcceptedFormat)}
+            <strong>File Format:</strong> ${metadata.isMP4 ? 'MP4' : metadata.fileExtension.toUpperCase()} 
+            ${isMP4 ? '(Recommended)' : isAcceptedFormat ? '(Accepted - MP4 recommended)' : '(Not accepted by Wistia)'}
+          </div>
+          
+          <div class="requirement">
+            ${getStatusIcon(isValidResolution)}
+            <strong>Resolution:</strong> ${metadata.width}x${metadata.height} ${getResolutionBadge()}
+          </div>
+          
+          <div class="requirement">
+            ${getStatusIcon(true)}
+            <strong>Bitrate:</strong> ${estimatedBitrate} kbps
+          </div>
+          
+          <div class="requirement">
+            ${getStatusIcon(true)}
+            <strong>Frame Rate:</strong> ~${metadata.frameRate} fps
+          </div>
+          
+          <div class="requirement">
+            ${getStatusIcon(true)}
+            <strong>Duration:</strong> ${formattedDuration}
+          </div>
+        `;
+        
+        // Show file info and metadata
+        result.innerHTML = `
+          <h3>File Analysis Results</h3>
+          <p><strong>File:</strong> ${metadata.file.name}</p>
+          <p><strong>Size:</strong> ${formatFileSize(metadata.file.size)}</p>
+          <p><strong>Format:</strong> ${formatMediaType(metadata.videoType)}</p>
+          
+          <h4>Video Information</h4>
+          <div>${videoInfo}</div>
+          
+          <button class="collapsible">Wistia Requirements <span style="font-size: 12px; font-weight: normal; float: right;">(Click to expand)</span></button>
+          <div class="collapsible-content">
+            <h5>Video</h5>
+            <ul>
+              <li><strong>File Type:</strong> MP4 (recommended)</li>
+              <li><strong>Codec:</strong> h.264/AVC (required)</li>
+              <li><strong>Resolution:</strong> between 640px and 3840px wide</li>
+              <li><strong>Bitrate:</strong> 5,000–8,000 kbps (recommended for HD), up to 15,000 kbps for 4K</li>
+              <li><strong>Framerate:</strong> constant, 15–60 frames per second</li>
+              <li><strong>Aspect Ratio:</strong> We accept videos of any aspect ratio, but wider = higher quality</li>
+            </ul>
+            
+            <h5>Audio</h5>
+            <ul>
+              <li><strong>Codec:</strong> AAC (Advanced Audio Codec)</li>
+              <li><strong>Sample Rate:</strong> 44.1 kHz</li>
+              <li><strong>Channels:</strong> 2-channel Stereo (not surround)</li>
+            </ul>
+          </div>
+          
+          <button class="collapsible">Derivative Bitrates <span style="font-size: 12px; font-weight: normal; float: right;">(Click to expand)</span></button>
+          <div class="collapsible-content">
+            <table class="spec-table">
+              <tr>
+                <th>Derivative</th>
+                <th>Max Bitrate</th>
+              </tr>
+              <tr>
+                <td>3840 x 2160p (4K)</td>
+                <td>11,250 kbps</td>
+              </tr>
+              <tr>
+                <td>1920 x 1080p</td>
+                <td>5,625 kbps</td>
+              </tr>
+              <tr>
+                <td>1280 x 720p</td>
+                <td>3,750 kbps</td>
+              </tr>
+              <tr>
+                <td>960 x 540p</td>
+                <td>1,800 kbps</td>
+              </tr>
+              <tr>
+                <td>640 x 360p</td>
+                <td>1,200 kbps</td>
+              </tr>
+              <tr>
+                <td>400 x 224p</td>
+                <td>300 kbps</td>
+              </tr>
+            </table>
+          </div>
+          
+          <button class="collapsible">Supported Formats <span style="font-size: 12px; font-weight: normal; float: right;">(Click to expand)</span></button>
+          <div class="collapsible-content">
+            <p><strong>Recommended:</strong> MP4 format with H.264 codec (required for video), MP3 format for audio-only files</p>
+            
+            <p><strong>Video:</strong> MOV, MPG, AVI, FLV, F4V, MP4, M4V, ASF, WMV, VOB, MOD, 3GP, MKV, DIVX, XVID, WEBM</p>
+            <p><strong>Audio:</strong> MP3, WAV, AIF, AU, M4A, OGG</p>
+          </div>
+          
+          <button class="collapsible">Troubleshooting <span style="font-size: 12px; font-weight: normal; float: right;">(Click to expand)</span></button>
+          <div class="collapsible-content">
+            <h5>Need to convert your video to H.264?</h5>
+            <p>We recommend <a href="https://handbrake.fr/" target="_blank">Handbrake</a>, a free tool we use all the time. It can convert nearly any video format to properly optimized MP4 files for Wistia.</p>
+            
+            <h5>Export Settings</h5>
+            <p>Follow our <a href="https://support.wistia.com/en/articles/8268259-export-settings" target="_blank">guidelines on media export settings</a> to get the best quality output for your content in Wistia.</p>
+            
+            <h5>Media Upload and Encoding Troubleshooting</h5>
+            <p>If your uploaded media doesn't look quite right, check out our <a href="https://support.wistia.com/en/articles/8279759-upload-troubleshooting" target="_blank">Upload Troubleshooting</a> or <a href="https://support.wistia.com/en/articles/8273611-media-encoding-troubleshooting" target="_blank">Media Encoding Troubleshooting Guide</a> for help.</p>
+          </div>
+        `;
+      }
+      
+      // Format file size
+      function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      }
+    });
+  </script>
+</body>
+</html>
